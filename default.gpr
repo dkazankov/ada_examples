@@ -1,5 +1,7 @@
 project Default is
 
+    for Create_Missing_Dirs use "True";
+    
     type Build_Mode is ("Release", "Debug");
 
     for Source_Dirs use (".");

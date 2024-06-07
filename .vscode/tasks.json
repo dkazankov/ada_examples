@@ -35,13 +35,26 @@
             "configuration": {
                 "kind": "buildProject",
                 "projectFile": "default.gpr",
-                "args": []
+                "args": ["-XBUILD=Debug"]
             },
             "problemMatcher": [
                 "$ada"
             ],
             "group": "build",
-            "label": "ada: Build current project"
+            "label": "ada: Debug build current project"
+        },
+        {
+            "type": "ada",
+            "configuration": {
+                "kind": "buildProject",
+                "projectFile": "default.gpr",
+                "args": ["-XBUILD=Release"]
+            },
+            "problemMatcher": [
+                "$ada"
+            ],
+            "group": "build",
+            "label": "ada: Release build current project"
         },
         {
             "type": "ada",

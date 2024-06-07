@@ -5,3 +5,8 @@
 *.ali
 
 obj/
+
+mandelbrot
+mandelbrot.pbm
+two_sum
+weird_numbers
