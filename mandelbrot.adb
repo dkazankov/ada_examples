@@ -5,15 +5,18 @@ with Ada.Command_Line;
 with Ada.Characters.Latin_1;
 with Ada.Text_IO.Text_Streams;
 with Ada.Streams.Stream_IO;
-with Ada.Unchecked_Deallocation;
+with Ada.Strings.Fixed;
 
 use Ada.Command_Line;
 use Ada.Characters;
 use Ada.Text_IO;
 use Ada.Text_IO.Text_Streams;
 use Ada.Streams;
+use Ada.Strings;
 
 procedure Mandelbrot is
+
+    type Real is digits 15;
 
     type Bit_Type is mod 2;
     for Bit_Type'Size use 1;
@@ -38,43 +41,29 @@ procedure Mandelbrot is
     Null_Byte: constant Byte_Type := (Option => Byte_As_Stream_Element, As_Stream_Element => 0);
 
     type Stream_Element_Array_Access is access Stream_Element_Array;
-    procedure Free is new Ada.Unchecked_Deallocation(Stream_Element_Array, Stream_Element_Array_Access);
-    Buffer: Stream_Element_Array_Access;
 
     w, h: Natural := 16000;
     iter: Natural := 50;
-    limit: Long_Float := 2.0;
+    limit: Real := 2.0;
 
-    task type Worker_Type is
-        entry Start(P1, P2: Natural);
-        entry Wait;
-    end Worker_Type;
-
-    task body Worker_Type is
-        Y1, Y2: Natural;
+    procedure Calculate_Chunk(Y1, Y2: Natural; Buffer: Stream_Element_Array_Access) is
         Byte_Num: Stream_Element_Offset := 1;
         Byte: Byte_Type := Null_Byte;
         Bit_Num: Byte_Bit_Num_Type := Byte_Bit_Num_Type'First;
         Bit_Value: Bit_Type;
 
-        kh, kw, limit2: Long_Float;
+        kh, kw, limit2: Real;
 
-        Zr, Zi, Cr, Ci, Tr, Ti: Long_Float;
+        Zr, Zi, Cr, Ci, Tr, Ti: Real;
     begin
-        accept Start(P1, P2: Natural) do
-            Y1 := P1;
-            Y2 := P2;
-        end Start;
-        Put_Line(Standard_Error, "Worker " & Natural'Image(Y1) & ".." & Natural'Image(Y2) & " started");
-
-        kh := 2.0 / Long_Float(h);
-        kw := 2.0 / Long_Float(w);
+        kh := 2.0 / Real(h);
+        kw := 2.0 / Real(w);
         limit2 := limit * limit;
 
         for y in Y1..Y2 loop 
-            Ci := kh * Long_Float(y) - 1.0;
+            Ci := kh * Real(y) - 1.0;
             for x in 0..w-1 loop
-                Cr := kw * Long_Float(x) - 1.5;
+                Cr := kw * Real(x) - 1.5;
 
                 Zr := 0.0;
                 Zi := 0.0;
@@ -109,19 +98,38 @@ procedure Mandelbrot is
                 end if;
             end loop;
         end loop;
+    end Calculate_Chunk;
 
-        Put_Line(Standard_Error, "Worker " & Natural'Image(Y1) & ".." & Natural'Image(Y2) & " stopped");
+    task type Worker_Type is
+        entry Start(Chunk: Natural; Y1, Y2: Natural; Buffer: Stream_Element_Array_Access);
+        entry Wait;
+    end Worker_Type;
+
+    task body Worker_Type is
+        mChunk, mY1, mY2: Natural;
+        mBuffer: Stream_Element_Array_Access;
+    begin
+        accept Start(Chunk: Natural; Y1, Y2: Natural; Buffer: Stream_Element_Array_Access) do
+            mChunk := Chunk;
+            mY1 := Y1;
+            mY2 := Y2;
+            mBuffer := Buffer;
+        end Start;
+        Calculate_Chunk(mY1, mY2, mBuffer);
         accept Wait;
     end Worker_Type;
 
-    type Worker_Array is array(Natural range <>) of Worker_Type;
-    type Worker_Array_Access is access Worker_Array;
-    procedure Free is new Ada.Unchecked_Deallocation(Worker_Array, Worker_Array_Access);
+    function Sum(Value: Natural) return Natural is
+        S: Natural := 0;
+    begin
+        for I in 1..Value loop
+            S := S + I;
+        end loop;
+        return S;
+    end Sum;
 
-    Workers: Worker_Array_Access;
-    Workers_Num: Natural := 4;
-
-    Y1, Y2, I_Len, Y_Add: Natural;
+    Workers_Num: Natural := 32;
+    Write_Times: Natural := 5;
     Stdout: Stream_Access := Stream(Standard_Output);
 begin
     if Argument_Count > 0 then
@@ -133,36 +141,43 @@ begin
         Workers_Num := Natural'Value(Argument(2));
     end if;
     if Argument_Count > 2 then
-        iter := Natural'Value(Argument(3));
+        Write_Times := Natural'Value(Argument(3));
     end if;
     if Argument_Count > 3 then
-        limit := Long_Float'Value(Argument(4));
+        iter := Natural'Value(Argument(4));
+    end if;
+    if Argument_Count > 4 then
+        limit := Real'Value(Argument(5));
     end if;
 
-    Buffer := new Stream_Element_Array (1..Stream_Element_Offset(w*h/8));
+    String'Write(Stdout, "P4" & Latin_1.CR & Fixed.Trim(Natural'Image(w), Left) & Natural'Image(h) & Latin_1.CR);
 
-    Workers := new Worker_Array (1..Workers_Num);
-
-    I_Len := h / Workers_Num;
-    Y_Add := h rem Workers_Num;
-    Y1 := 0;
-    for I in Workers'Range loop
-        Y2 := Y1 + I_Len - 1;
-        if Y_Add /= 0 then
-            Y2 := Y2 + 1;
-        end if;
-        Workers(I).Start(Y1, Y2);
-        Y1 := Y2 + 1;
-        if Y_Add /= 0 then
-            Y_Add := Y_Add - 1;
-        end if;
-    end loop;
-    for I in reverse Workers'Range loop
-        Workers(I).Wait;
-    end loop;
-    Free(Workers);
-
-    String'Write(Stdout, "P4" & Latin_1.CR & Argument(1) & " " & Argument(1) & Latin_1.CR);
-    Write(Stdout.all, Buffer.all);
-    Free(Buffer);
+    declare
+        subtype Worker_Index is Natural range 1..Workers_Num;
+        Workers: array (Worker_Index) of Worker_Type;
+        Buffer: array (Worker_Index) of Stream_Element_Array_Access;
+        Buf_Size: Natural;
+        Initial_Chunk_Size: constant Natural := h / Sum(Workers_Num) / Write_Times;
+        Chunk_Size_Inc: constant Natural := Initial_Chunk_Size * Write_Times;
+        Chunk_Size: Natural := Initial_Chunk_Size;
+        Y1, Y2: Natural;
+    begin
+        Y1 := 0;
+        for I in Workers'Range loop
+            if I = Workers'Last then
+                Y2 := h;
+            else
+                Y2 := Y1 + Chunk_Size - 1;
+            end if;
+            Buf_Size := w*(Y2-Y1+1)/8;
+            Buffer(I) := new Stream_Element_Array (1..Stream_Element_Offset(Buf_Size));
+            Workers(I).Start(I, Y1, Y2, Buffer(I));
+            Y1 := Y2 + 1;
+            Chunk_Size := Chunk_Size + Chunk_Size_Inc;
+        end loop;
+        for I in Workers'Range loop
+            Workers(I).Wait;
+            Write(Stdout.all, Buffer(I).all);
+        end loop;
+    end;
 end Mandelbrot;
