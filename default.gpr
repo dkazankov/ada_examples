@@ -1,0 +1,39 @@
+project Default is
+
+    type Build_Mode is ("Release", "Debug");
+
+    for Source_Dirs use (".");
+    for Object_Dir use "obj";
+    for Exec_Dir use ".";
+    for Main use ("two_sum.adb", "weird_numbers.adb", "mandelbrot.adb");
+
+    BUILD: Build_Mode := External("BUILD", "Debug");
+
+    package Builder is
+        case BUILD is
+            when "Release" =>
+                for Switches ("Ada") use ("-s");
+            when "Debug" =>
+                for Switches ("Ada") use ("-s", "-g");
+        end case;
+    end Builder;
+
+    package Compiler is
+        case BUILD is
+            when "Release" =>
+                for Switches ("Ada") use ("-gnatn", "-gnatp", "-O3");
+            when "Debug" =>
+                for Switches ("Ada") use ("-g");
+        end case;
+    end Compiler;
+
+    package Linker is
+        case BUILD is
+            when "Release" =>
+                for Switches ("Ada") use ("");
+            when "Debug" =>
+                for Switches ("Ada") use ("-g");
+        end case;
+    end Linker;
+
+end Default;

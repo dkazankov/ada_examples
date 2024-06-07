@@ -1,0 +1,89 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Debug build current file with gnatmake",
+            "type": "shell",
+            "problemMatcher": [
+                "$ada"
+            ],
+            "group": "build",
+            "command": "gnatmake -D obj -f -g ${file}"
+        },
+        {
+            "label": "Release build current file with gnatmake",
+            "type": "shell",
+            "problemMatcher": [
+                "$ada"
+            ],
+            "group": "build",
+            "command": "gnatmake -D obj -f ${file} -cargs -gnatn -gnatp -O3"
+        },
+        {
+            "label": "gnatx build current file with gnatmake",
+            "type": "shell",
+            "problemMatcher": [
+                "$ada"
+            ],
+            "group": "build",
+            "command": "gnatmake -D obj -f ${file} -cargs -gnat2022 -gnatX -O3"
+        },
+        {
+            "type": "ada",
+            "configuration": {
+                "kind": "buildProject",
+                "projectFile": "default.gpr",
+                "args": []
+            },
+            "problemMatcher": [
+                "$ada"
+            ],
+            "group": "build",
+            "label": "ada: Build current project"
+        },
+        {
+            "type": "ada",
+            "configuration": {
+                "kind": "buildMain",
+                "projectFile": "default.gpr",
+                "main": "two_sum.adb",
+                "args": []
+            },
+            "problemMatcher": [
+                "$ada"
+            ],
+            "group": "build",
+            "label": "ada: Build main - two_sum.adb"
+        },
+        {
+            "type": "ada",
+            "configuration": {
+                "kind": "buildMain",
+                "projectFile": "default.gpr",
+                "main": "weird_numbers.adb",
+                "args": []
+            },
+            "problemMatcher": [
+                "$ada"
+            ],
+            "group": "build",
+            "label": "ada: Build main - weird_numbers.adb"
+        },
+        {
+            "type": "ada",
+            "configuration": {
+                "kind": "buildMain",
+                "projectFile": "default.gpr",
+                "main": "mandelbrot.adb",
+                "args": ["-XBUILD=Debug"]
+            },
+            "problemMatcher": [
+                "$ada"
+            ],
+            "group": "build",
+            "label": "ada: Build main - mandelbrot.adb"
+        }
+    ]
+}
